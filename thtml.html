@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vehicle Engine Health Monitor</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script>
+    let lastSpokenText = "";
+    function speakOnce(text) {
+      if (text !== lastSpokenText) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(utterance);
+        lastSpokenText = text;
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-6">
+  <div class="bg-white shadow-2xl rounded-2xl p-8 max-w-xl w-full">
+    <h1 class="text-3xl font-bold text-center text-blue-600 mb-6">Vehicle Engine Health Monitor</h1>
+    <form id="healthForm" class="space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <input class="border border-gray-300 rounded-lg p-2" type="number" name="GPS_Speed" placeholder="GPS Speed" required>
+        <input class="border border-gray-300 rounded-lg p-2" type="number" name="OBD_Speed" placeholder="OBD Speed" required>
+        <input class="border border-gray-300 rounded-lg p-2" type="number" name="RPM" placeholder="RPM" required>
+        <input class="border border-gray-300 rounded-lg p-2" type="number" name="Throttle" placeholder="Throttle" required>
+        <input class="border border-gray-300 rounded-lg p-2" type="number" name="Engine_Load" placeholder="Engine Load" required>
+        <input class="border border-gray-300 rounded-lg p-2" type="number" name="Coolant_Temp" placeholder="Coolant Temp" required>
+      </div>
+      <button type="submit" class="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700">Predict Health</button>
+    </form>
+    <div id="result" class="mt-6 text-center text-gray-800 font-medium whitespace-pre-line"></div>
+  </div>
+
+  <script>
+    document.getElementById('healthForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const payload = {};
+      formData.forEach((value, key) => {
+        payload[key] = parseFloat(value);
+      });
+
+      document.getElementById('result').innerText = "🔄 Processing... Please wait.";
+
+      try {
+        const response = await fetch('/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const text = await response.text();
+        console.log("📦 Raw response from server:", text);
+        const result = JSON.parse(text);
+
+        if (result.error) throw new Error(result.error);
+
+        const report = `📋 <span class='text-lg font-semibold text-yellow-600'>Engine Health Report</span><br><br>
+Fuel Consumption: ${result.fuel} L/100km<br>
+CO2 Emission: ${result.co2} g/km<br>
+Engine Temp: ${result.temp} °C<br>
+Brake Wear: ${result.brake} %<br>
+Maintenance Score: ${result.score}/100<br><br>
+<span class='text-green-600 font-semibold'>Advice:</span><br>${result.advice.replace(/\n/g, '<br>')}`;
+
+        document.getElementById('result').innerHTML = report;
+        speakOnce(result.advice.replace(/\n/g, ' '));
+      } catch (err) {
+        console.error("❌ Error:", err);
+        const errorMsg = "❌ Error occurred while processing request.";
+        document.getElementById('result').innerText = errorMsg;
+        speakOnce(errorMsg);
+      }
+    });
+  </script>
+</body>
+</html>
